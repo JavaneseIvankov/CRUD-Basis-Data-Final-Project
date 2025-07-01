@@ -4,6 +4,15 @@
  */
 package cafe;
 
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.sql.Connection;
+import java.util.ArrayList;
+import java.util.List;
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import java.util.logging.Level;
+
 /**
  *
  * @author parasite
@@ -11,12 +20,19 @@ package cafe;
 public class View extends javax.swing.JFrame {
     
     private static final java.util.logging.Logger logger = java.util.logging.Logger.getLogger(View.class.getName());
+    private CafeDAO cafeDAO;
+    private DefaultTableModel tableModel;
 
     /**
      * Creates new form View
      */
     public View() {
         initComponents();
+        cafeDAO = new CafeDAO();
+        initializeData();
+        setupEventHandlers();
+        setupMenuBar(); // Add menu bar
+        loadOrdersTable();
     }
 
     /**
@@ -70,16 +86,11 @@ public class View extends javax.swing.JFrame {
 
         listMenu.setBackground(new java.awt.Color(255, 255, 255));
         listMenu.setForeground(new java.awt.Color(0, 0, 0));
-        listMenu.setModel(new javax.swing.AbstractListModel<String>() {
-            String[] strings = { "Item 1", "Item 2", "Item 3", "Item 4", "Item 5" };
-            public int getSize() { return strings.length; }
-            public String getElementAt(int i) { return strings[i]; }
-        });
+        listMenu.setSelectionMode(javax.swing.ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
         jScrollPane2.setViewportView(listMenu);
 
         comboNomorMeja.setBackground(new java.awt.Color(255, 255, 255));
         comboNomorMeja.setForeground(new java.awt.Color(0, 0, 0));
-        comboNomorMeja.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Item 1", "Item 2", "Item 3", "Item 4" }));
 
         jLabel5.setBackground(new java.awt.Color(0, 0, 0));
         jLabel5.setFont(new java.awt.Font("Adwaita Mono", 0, 13)); // NOI18N
@@ -89,13 +100,14 @@ public class View extends javax.swing.JFrame {
 
         txtDetailPesanan.setBackground(new java.awt.Color(255, 255, 255));
         txtDetailPesanan.setForeground(new java.awt.Color(0, 0, 0));
-        txtDetailPesanan.setText("jTextField1");
+        txtDetailPesanan.setText("");
+        txtDetailPesanan.setToolTipText("Masukkan catatan khusus untuk pesanan");
 
         jLabel4.setBackground(new java.awt.Color(0, 0, 0));
         jLabel4.setFont(new java.awt.Font("Adwaita Mono", 0, 13)); // NOI18N
         jLabel4.setForeground(new java.awt.Color(62, 44, 35));
         jLabel4.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
-        jLabel4.setText("Detail Pesanan");
+        jLabel4.setText("Catatan Pesanan");
 
         jLabel2.setBackground(new java.awt.Color(0, 0, 0));
         jLabel2.setFont(new java.awt.Font("Adwaita Mono", 0, 13)); // NOI18N
@@ -105,7 +117,6 @@ public class View extends javax.swing.JFrame {
 
         comboPegawai.setBackground(new java.awt.Color(255, 255, 255));
         comboPegawai.setForeground(new java.awt.Color(0, 0, 0));
-        comboPegawai.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Item 1", "Item 2", "Item 3", "Item 4" }));
 
         jLabel1.setBackground(new java.awt.Color(0, 0, 0));
         jLabel1.setFont(new java.awt.Font("Adwaita Mono", 0, 13)); // NOI18N
@@ -115,7 +126,8 @@ public class View extends javax.swing.JFrame {
 
         txtPemesan.setBackground(new java.awt.Color(255, 255, 255));
         txtPemesan.setForeground(new java.awt.Color(0, 0, 0));
-        txtPemesan.setText("jTextField1");
+        txtPemesan.setText("");
+        txtPemesan.setToolTipText("Masukkan nama pemesan");
 
         jLabel6.setBackground(new java.awt.Color(0, 0, 0));
         jLabel6.setFont(new java.awt.Font("Adwaita Mono", 0, 13)); // NOI18N
@@ -125,7 +137,6 @@ public class View extends javax.swing.JFrame {
 
         comboMetodePembayaran.setBackground(new java.awt.Color(255, 255, 255));
         comboMetodePembayaran.setForeground(new java.awt.Color(0, 0, 0));
-        comboMetodePembayaran.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Item 1", "Item 2", "Item 3", "Item 4" }));
 
         jLabel8.setBackground(new java.awt.Color(0, 0, 0));
         jLabel8.setFont(new java.awt.Font("Adwaita Mono", 0, 13)); // NOI18N
@@ -203,17 +214,6 @@ public class View extends javax.swing.JFrame {
 
         jTable1.setBackground(new java.awt.Color(255, 255, 255));
         jTable1.setForeground(new java.awt.Color(0, 0, 0));
-        jTable1.setModel(new javax.swing.table.DefaultTableModel(
-            new Object [][] {
-                {null, null, null, null},
-                {null, null, null, null},
-                {null, null, null, null},
-                {null, null, null, null}
-            },
-            new String [] {
-                "Title 1", "Title 2", "Title 3", "Title 4"
-            }
-        ));
         jTable1.setSelectionBackground(new java.awt.Color(153, 153, 255));
         jScrollPane1.setViewportView(jTable1);
 
@@ -342,4 +342,434 @@ public class View extends javax.swing.JFrame {
     private javax.swing.JTextField txtDetailPesanan;
     private javax.swing.JTextField txtPemesan;
     // End of variables declaration//GEN-END:variables
+
+    /**
+     * Initialize data from database
+     */
+    private void initializeData() {
+        try {
+            // Test database connection first
+            if (!DatabaseConnection.testConnection()) {
+                JOptionPane.showMessageDialog(this, 
+                    "Tidak dapat terhubung ke database. Pastikan SQL Server sudah berjalan.",
+                    "Database Error", JOptionPane.ERROR_MESSAGE);
+                System.exit(1);
+            }
+
+            // Initialize sample data
+            cafeDAO.initializeSampleData();
+
+            // Load employees
+            loadEmployees();
+            
+            // Load menu items
+            loadMenuItems();
+            
+            // Load tables
+            loadTables();
+            
+            // Load payment methods
+            loadPaymentMethods();
+            
+            // Setup table model
+            setupTableModel();
+            
+        } catch (Exception e) {
+            logger.log(Level.SEVERE, "Failed to initialize data", e);
+            JOptionPane.showMessageDialog(this, 
+                "Error initializing application: " + e.getMessage(),
+                "Initialization Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    /**
+     * Load employees into combo box
+     */
+    private void loadEmployees() {
+        List<String> employees = cafeDAO.getAllEmployees();
+        DefaultComboBoxModel<String> model = new DefaultComboBoxModel<>();
+        
+        for (String employee : employees) {
+            model.addElement(employee);
+        }
+        
+        comboPegawai.setModel(model);
+    }
+
+    /**
+     * Load menu items into list
+     */
+    private void loadMenuItems() {
+        List<String> menuItems = cafeDAO.getAllMenuItems();
+        System.out.println("[LOGGGG] Menu Items: " + menuItems);
+        DefaultListModel<String> model = new DefaultListModel<>();
+        
+        for (String item : menuItems) {
+            model.addElement(item);
+        }
+        
+        listMenu.setModel(model);
+    }
+
+    /**
+     * Load tables into combo box
+     */
+    private void loadTables() {
+        List<String> tables = cafeDAO.getAvailableTables();
+        DefaultComboBoxModel<String> model = new DefaultComboBoxModel<>();
+        
+        for (String table : tables) {
+            model.addElement(table);
+        }
+        
+        comboNomorMeja.setModel(model);
+    }
+
+    /**
+     * Load payment methods into combo box
+     */
+    private void loadPaymentMethods() {
+        List<String> methods = cafeDAO.getPaymentMethods();
+        DefaultComboBoxModel<String> model = new DefaultComboBoxModel<>();
+        
+        for (String method : methods) {
+            model.addElement(method);
+        }
+        
+        comboMetodePembayaran.setModel(model);
+    }
+
+    /**
+     * Setup table model for orders
+     */
+    private void setupTableModel() {
+        String[] columnNames = {
+            "Pemesan", "Meja", "Menu Items", "Pembayaran", "Total"
+        };
+        
+        tableModel = new DefaultTableModel(columnNames, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false; // Make table read-only
+            }
+        };
+        
+        jTable1.setModel(tableModel);
+        
+        // Set column widths
+        jTable1.getColumnModel().getColumn(0).setPreferredWidth(120); // Pemesan
+        jTable1.getColumnModel().getColumn(1).setPreferredWidth(80);  // Meja
+        jTable1.getColumnModel().getColumn(2).setPreferredWidth(250); // Menu Items
+        jTable1.getColumnModel().getColumn(3).setPreferredWidth(100); // Pembayaran
+        jTable1.getColumnModel().getColumn(4).setPreferredWidth(100); // Total
+    }
+
+    /**
+     * Setup event handlers for buttons
+     */
+    private void setupEventHandlers() {
+        // Input button handler
+        btnInput.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                handleInputOrder();
+            }
+        });
+
+        // Layani (Serve) button handler
+        btnLayani.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                handleServeOrder();
+            }
+        });
+    }
+
+    /**
+     * Setup menu bar with database operations
+     */
+    private void setupMenuBar() {
+        JMenuBar menuBar = new JMenuBar();
+        
+        // Database menu
+        JMenu databaseMenu = new JMenu("Database");
+        
+        // Seed data menu item
+        JMenuItem seedDataItem = new JMenuItem("Seed Sample Data");
+        seedDataItem.addActionListener(e -> handleSeedData());
+        
+        // Clear data menu item
+        JMenuItem clearDataItem = new JMenuItem("Clear All Data");
+        clearDataItem.addActionListener(e -> handleClearData());
+        
+        // Refresh data menu item
+        JMenuItem refreshDataItem = new JMenuItem("Refresh Data");
+        refreshDataItem.addActionListener(e -> handleRefreshData());
+        
+        databaseMenu.add(seedDataItem);
+        databaseMenu.addSeparator();
+        databaseMenu.add(refreshDataItem);
+        databaseMenu.addSeparator();
+        databaseMenu.add(clearDataItem);
+        
+        menuBar.add(databaseMenu);
+        
+        setJMenuBar(menuBar);
+    }
+
+    /**
+     * Handle seed data action
+     */
+    private void handleSeedData() {
+        int confirm = JOptionPane.showConfirmDialog(this,
+            "Ini akan menghapus semua data yang ada dan mengisi dengan data contoh.\n" +
+            "Apakah Anda yakin ingin melanjutkan?",
+            "Seed Database", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+        
+        if (confirm == JOptionPane.YES_OPTION) {
+            try {
+                boolean success = cafeDAO.seedDatabase();
+                
+                if (success) {
+                    JOptionPane.showMessageDialog(this,
+                        "Database berhasil diisi dengan data contoh!",
+                        "Seed Success", JOptionPane.INFORMATION_MESSAGE);
+                    
+                    // Refresh all data
+                    handleRefreshData();
+                } else {
+                    JOptionPane.showMessageDialog(this,
+                        "Gagal mengisi database dengan data contoh.",
+                        "Seed Error", JOptionPane.ERROR_MESSAGE);
+                }
+            } catch (Exception e) {
+                JOptionPane.showMessageDialog(this,
+                    "Error: " + e.getMessage(),
+                    "Seed Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+
+    /**
+     * Handle clear data action
+     */
+    private void handleClearData() {
+        int confirm = JOptionPane.showConfirmDialog(this,
+            "Ini akan menghapus SEMUA data dari database.\n" +
+            "Apakah Anda benar-benar yakin?",
+            "Clear Database", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+        
+        if (confirm == JOptionPane.YES_OPTION) {
+            try {
+                // Use the CafeDAO to safely clear data
+                boolean success = cafeDAO.clearDatabaseSafely();
+                
+                if (success) {
+                    JOptionPane.showMessageDialog(this,
+                        "Semua data berhasil dihapus!",
+                        "Clear Success", JOptionPane.INFORMATION_MESSAGE);
+                    
+                    // Refresh all data
+                    handleRefreshData();
+                } else {
+                    JOptionPane.showMessageDialog(this,
+                        "Gagal menghapus data.",
+                        "Clear Error", JOptionPane.ERROR_MESSAGE);
+                }
+                
+            } catch (Exception e) {
+                JOptionPane.showMessageDialog(this,
+                    "Error: " + e.getMessage(),
+                    "Clear Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+
+    /**
+     * Handle refresh data action
+     */
+    private void handleRefreshData() {
+        try {
+            loadEmployees();
+            loadMenuItems();
+            loadTables();
+            loadOrdersTable();
+            
+            JOptionPane.showMessageDialog(this,
+                "Data berhasil di-refresh!",
+                "Refresh Success", JOptionPane.INFORMATION_MESSAGE);
+                
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this,
+                "Error refreshing data: " + e.getMessage(),
+                "Refresh Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    /**
+     * Handle input order button click
+     */
+    private void handleInputOrder() {
+        try {
+            // Validate input
+            if (!validateInput()) {
+                return;
+            }
+
+            // Get form data
+            String customerName = txtPemesan.getText().trim();
+            String employeeName = (String) comboPegawai.getSelectedItem();
+            String tableInfo = (String) comboNomorMeja.getSelectedItem();
+            String orderDetails = txtDetailPesanan.getText().trim();
+            String paymentMethod = (String) comboMetodePembayaran.getSelectedItem();
+
+            // Get selected menu items
+            List<String> selectedMenuItems = listMenu.getSelectedValuesList();
+
+            // Insert order
+            boolean success = cafeDAO.insertOrder(customerName, employeeName, tableInfo, 
+                                                 orderDetails, paymentMethod, selectedMenuItems);
+
+            if (success) {
+                JOptionPane.showMessageDialog(this, 
+                    "Pesanan berhasil ditambahkan!", 
+                    "Success", JOptionPane.INFORMATION_MESSAGE);
+                
+                // Clear form
+                clearForm();
+                
+                // Refresh orders table
+                loadOrdersTable();
+            } else {
+                JOptionPane.showMessageDialog(this, 
+                    "Gagal menambahkan pesanan. Silakan coba lagi.", 
+                    "Error", JOptionPane.ERROR_MESSAGE);
+            }
+
+        } catch (Exception e) {
+            logger.log(Level.SEVERE, "Error processing order", e);
+            JOptionPane.showMessageDialog(this, 
+                "Error: " + e.getMessage(), 
+                "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    /**
+     * Handle serve order button click
+     */
+    private void handleServeOrder() {
+        int selectedRow = jTable1.getSelectedRow();
+        
+        if (selectedRow == -1) {
+            JOptionPane.showMessageDialog(this, 
+                "Pilih pesanan yang akan dilayani terlebih dahulu.", 
+                "No Selection", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        // Get order details from selected row (now without ID column)
+        String customerName = (String) tableModel.getValueAt(selectedRow, 0); // Pemesan
+        String tableInfo = (String) tableModel.getValueAt(selectedRow, 1);    // Meja
+        String menuItems = (String) tableModel.getValueAt(selectedRow, 2);    // Menu Items
+
+        // Confirm action
+        int confirm = JOptionPane.showConfirmDialog(this, 
+            "Apakah Anda yakin ingin melayani pesanan dari " + customerName + " di " + tableInfo + "?", 
+            "Confirm Serve Order", JOptionPane.YES_NO_OPTION);
+
+        if (confirm == JOptionPane.YES_OPTION) {
+            boolean success = cafeDAO.deleteOrderByDetails(customerName, tableInfo, menuItems);
+            
+            if (success) {
+                JOptionPane.showMessageDialog(this, 
+                    "Pesanan berhasil dilayani!", 
+                    "Success", JOptionPane.INFORMATION_MESSAGE);
+                
+                // Refresh orders table
+                loadOrdersTable();
+            } else {
+                JOptionPane.showMessageDialog(this, 
+                    "Gagal melayani pesanan. Silakan coba lagi.", 
+                    "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+
+    /**
+     * Validate form input
+     */
+    private boolean validateInput() {
+        if (txtPemesan.getText().trim().isEmpty()) {
+            JOptionPane.showMessageDialog(this, 
+                "Nama pemesan harus diisi!", 
+                "Validation Error", JOptionPane.WARNING_MESSAGE);
+            txtPemesan.requestFocus();
+            return false;
+        }
+
+        if (comboPegawai.getSelectedItem() == null) {
+            JOptionPane.showMessageDialog(this, 
+                "Pilih pegawai terlebih dahulu!", 
+                "Validation Error", JOptionPane.WARNING_MESSAGE);
+            return false;
+        }
+
+        if (comboNomorMeja.getSelectedItem() == null) {
+            JOptionPane.showMessageDialog(this, 
+                "Pilih nomor meja terlebih dahulu!", 
+                "Validation Error", JOptionPane.WARNING_MESSAGE);
+            return false;
+        }
+
+        if (listMenu.getSelectedValuesList().isEmpty()) {
+            JOptionPane.showMessageDialog(this, 
+                "Pilih minimal satu menu!", 
+                "Validation Error", JOptionPane.WARNING_MESSAGE);
+            return false;
+        }
+
+        if (comboMetodePembayaran.getSelectedItem() == null) {
+            JOptionPane.showMessageDialog(this, 
+                "Pilih metode pembayaran terlebih dahulu!", 
+                "Validation Error", JOptionPane.WARNING_MESSAGE);
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Clear form after successful input
+     */
+    private void clearForm() {
+        txtPemesan.setText("");
+        txtDetailPesanan.setText("");
+        listMenu.clearSelection();
+        
+        // Reset combo boxes to first item
+        if (comboPegawai.getItemCount() > 0) {
+            comboPegawai.setSelectedIndex(0);
+        }
+        if (comboNomorMeja.getItemCount() > 0) {
+            comboNomorMeja.setSelectedIndex(0);
+        }
+        if (comboMetodePembayaran.getItemCount() > 0) {
+            comboMetodePembayaran.setSelectedIndex(0);
+        }
+    }
+
+    /**
+     * Load orders into table
+     */
+    private void loadOrdersTable() {
+        Object[][] orders = cafeDAO.getAllOrders();
+        
+        // Clear existing data
+        tableModel.setRowCount(0);
+        
+        // Add new data
+        for (Object[] order : orders) {
+            tableModel.addRow(order);
+        }
+    }
 }
